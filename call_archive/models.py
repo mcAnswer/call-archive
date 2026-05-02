@@ -6,10 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 
 
 class RetentionDecision(StrEnum):
-    DELETE_AUDIO_KEEP_TRANSCRIPT = "delete_audio_keep_transcript"
-    KEEP_AUDIO = "keep_audio"
-    KEEP_AUDIO_IMPORTANT = "keep_audio_important"
-    NEEDS_REVIEW = "needs_review"
+    DEFAULT = "default"
+    KEEP = "keep"
+    DELETE = "delete"
+    REVIEW = "review"
 
 
 class ReviewStatus(StrEnum):
