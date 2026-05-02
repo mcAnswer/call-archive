@@ -63,17 +63,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def command_init(config: AppConfig) -> int:
-    ensure_layout(config.recordings_dir, config.transcripts_dir, config.notes_dir)
+    ensure_layout(config.ingest_dir, config.storage_dir, config.transcripts_dir, config.notes_dir)
     init_db(config.database_path)
     return 0
 
 
 def command_scan(config: AppConfig) -> int:
-    ensure_layout(config.recordings_dir, config.transcripts_dir, config.notes_dir)
+    ensure_layout(config.ingest_dir, config.storage_dir, config.transcripts_dir, config.notes_dir)
     init_db(config.database_path)
 
-    new_dir = config.recordings_dir / "new"
-    audio_files = sorted(path for path in new_dir.iterdir() if path.suffix.lower() in AUDIO_SUFFIXES)
+    audio_files = sorted(path for path in config.ingest_dir.iterdir() if path.suffix.lower() in AUDIO_SUFFIXES)
 
     with connect(config.database_path) as connection:
         for audio_path in audio_files:
@@ -83,7 +82,10 @@ def command_scan(config: AppConfig) -> int:
                 continue
 
             metadata = load_metadata(metadata_path)
-            target_audio, target_metadata = move_pair_to_year(audio_path, config.recordings_dir, metadata)
+            target_audio, target_metadata = move_pair_to_year(audio_path, config.storage_dir, metadata)
+            if not target_audio.exists() or not target_metadata.exists():
+                print(f"SKIP incomplete move: {audio_path}")
+                continue
             metadata = load_metadata(target_metadata)
 
             call = first_call(metadata)
@@ -100,18 +102,19 @@ def command_scan(config: AppConfig) -> int:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO calls (
-                    audio_path, metadata_path,
+                    audio_path, metadata_path, storage_stem,
                     phone_number, phone_number_formatted, contact_name,
                     direction, timestamp, year, duration_secs,
                     audio_sha256, metadata_sha256,
                     transcription_status, analysis_status,
                     review_status, category,
                     created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(target_audio),
                     str(target_metadata),
+                    target_audio.stem,
                     phone_number,
                     str(phone_number_formatted) if phone_number_formatted is not None else None,
                     str(contact_name) if contact_name is not None else None,
@@ -129,13 +132,30 @@ def command_scan(config: AppConfig) -> int:
                     now,
                 ),
             )
+
+            connection.execute(
+                """
+                UPDATE calls
+                SET audio_path = ?, metadata_path = ?, updated_at = ?
+                WHERE audio_path IN (?, ?) OR metadata_path IN (?, ?)
+                """,
+                (
+                    str(target_audio),
+                    str(target_metadata),
+                    now,
+                    str(audio_path),
+                    str(target_audio),
+                    str(sibling_metadata_path(audio_path)),
+                    str(target_metadata),
+                ),
+            )
             print(f"SCANNED {target_audio}")
 
     return 0
 
 
 def command_process(config: AppConfig, limit: int) -> int:
-    ensure_layout(config.recordings_dir, config.transcripts_dir, config.notes_dir)
+    ensure_layout(config.ingest_dir, config.storage_dir, config.transcripts_dir, config.notes_dir)
     init_db(config.database_path)
 
     with connect(config.database_path) as connection:
@@ -159,22 +179,21 @@ def command_process(config: AppConfig, limit: int) -> int:
             now = utc_now()
 
             try:
-                transcript_path = Path(str(call["transcript_path"])) if call["transcript_path"] else None
+                storage_stem = str(call["storage_stem"] or audio_path.stem)
+                transcript_path = config.transcripts_dir / f"{storage_stem}.txt"
                 if call["transcription_status"] != ProcessingStatus.DONE.value:
-                    transcript_path = run_transcription(audio_path, config.transcription)
-                    final_transcript_path = config.transcripts_dir / f"{audio_path.stem}.txt"
-                    final_transcript_path.write_text(
-                        transcript_path.read_text(encoding="utf-8"),
+                    generated_transcript_path = run_transcription(audio_path, config.transcription)
+                    transcript_path.write_text(
+                        generated_transcript_path.read_text(encoding="utf-8"),
                         encoding="utf-8",
                     )
-                    transcript_path = final_transcript_path
                     connection.execute(
                         """
                         UPDATE calls
-                        SET transcript_path = ?, transcription_status = ?, updated_at = ?, error = NULL
+                        SET storage_stem = ?, transcription_status = ?, updated_at = ?, error = NULL
                         WHERE id = ?
                         """,
-                        (str(transcript_path), ProcessingStatus.DONE.value, now, call_id),
+                        (storage_stem, ProcessingStatus.DONE.value, now, call_id),
                     )
 
                 if transcript_path is None:
@@ -197,7 +216,7 @@ def command_process(config: AppConfig, limit: int) -> int:
                     categories=config.categories,
                 )
 
-                note_path = config.notes_dir / f"{audio_path.stem}.json"
+                note_path = config.notes_dir / f"{storage_stem}.txt"
                 note_path.write_text(
                     note.model_dump_json(indent=2),
                     encoding="utf-8",
@@ -206,7 +225,7 @@ def command_process(config: AppConfig, limit: int) -> int:
                 connection.execute(
                     """
                     UPDATE calls
-                    SET note_path = ?,
+                    SET storage_stem = ?,
                         analysis_status = ?,
                         proposed_retention = ?,
                         category = ?,
@@ -216,7 +235,7 @@ def command_process(config: AppConfig, limit: int) -> int:
                     WHERE id = ?
                     """,
                     (
-                        str(note_path),
+                        storage_stem,
                         ProcessingStatus.DONE.value,
                         note.recommended_retention.value,
                         note.category,
@@ -294,8 +313,9 @@ def command_show(config: AppConfig, call_id: int) -> int:
         print(json.dumps(call, ensure_ascii=False, indent=2))
 
         note_path_raw = call.get("note_path")
-        if isinstance(note_path_raw, str) and note_path_raw:
-            note_path = Path(note_path_raw)
+        storage_stem = call.get("storage_stem")
+        if isinstance(storage_stem, str) and storage_stem:
+            note_path = config.notes_dir / f"{storage_stem}.txt"
             if note_path.exists():
                 print("\nNOTE:")
                 print(note_path.read_text(encoding="utf-8"))
@@ -345,7 +365,7 @@ def command_delete_approved(config: AppConfig) -> int:
                 print(f"SKIP missing audio #{call['id']}: {audio_path}")
                 continue
 
-            target = move_audio_to_rm(audio_path, config.recordings_dir)
+            target = move_audio_to_rm(audio_path, config.storage_dir)
             connection.execute(
                 """
                 UPDATE calls

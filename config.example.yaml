@@ -1,4 +1,5 @@
-recordings_dir: /data/calls
+ingest_dir: /data/calls/new
+storage_dir: /data/calls
 database_path: /data/calls/calls.sqlite
 transcripts_dir: /data/calls/transcripts
 notes_dir: /data/calls/notes

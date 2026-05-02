@@ -12,8 +12,7 @@ CREATE TABLE IF NOT EXISTS calls (
     id INTEGER PRIMARY KEY,
     audio_path TEXT UNIQUE NOT NULL,
     metadata_path TEXT NOT NULL,
-    transcript_path TEXT,
-    note_path TEXT,
+    storage_stem TEXT,
 
     phone_number TEXT,
     phone_number_formatted TEXT,
@@ -62,6 +61,9 @@ def connect(database_path: Path) -> Iterator[sqlite3.Connection]:
 def init_db(database_path: Path) -> None:
     with connect(database_path) as connection:
         connection.executescript(SCHEMA)
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(calls)").fetchall()}
+        if "storage_stem" not in columns:
+            connection.execute("ALTER TABLE calls ADD COLUMN storage_stem TEXT")
 
 
 def row_to_dict(row: sqlite3.Row) -> dict[str, Any]:

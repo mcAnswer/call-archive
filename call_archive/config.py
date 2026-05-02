@@ -29,7 +29,8 @@ class RetentionConfig(BaseModel):
 
 
 class AppConfig(BaseModel):
-    recordings_dir: Path
+    ingest_dir: Path
+    storage_dir: Path
     database_path: Path
     transcripts_dir: Path
     notes_dir: Path
