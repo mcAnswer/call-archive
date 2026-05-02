@@ -81,12 +81,22 @@ def command_scan(config: AppConfig) -> int:
                 print(f"SKIP missing metadata: {audio_path}")
                 continue
 
-            metadata = load_metadata(metadata_path)
+            try:
+                metadata = load_metadata(metadata_path)
+            except (json.JSONDecodeError, OSError, ValueError) as error:
+                print(f"WARNING invalid metadata JSON: {metadata_path} ({error})")
+                continue
+
             target_audio, target_metadata = move_pair_to_year(audio_path, config.storage_dir, metadata)
             if not target_audio.exists() or not target_metadata.exists():
                 print(f"SKIP incomplete move: {audio_path}")
                 continue
-            metadata = load_metadata(target_metadata)
+
+            try:
+                metadata = load_metadata(target_metadata)
+            except (json.JSONDecodeError, OSError, ValueError) as error:
+                print(f"WARNING invalid metadata JSON after move: {target_metadata} ({error})")
+                continue
 
             call = first_call(metadata)
             output = metadata.get("output", {})
