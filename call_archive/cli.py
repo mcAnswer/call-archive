@@ -211,14 +211,10 @@ def command_process(config: AppConfig, limit: int) -> int:
 
                 metadata = load_metadata(metadata_path)
                 transcript = transcript_path.read_text(encoding="utf-8")
-                phone_number = normalize_phone_number(str(call["phone_number"]))
-                normally_delete = phone_number in config.normalized_delete_numbers()
-
                 prompt = build_prompt(
                     metadata=metadata,
                     transcript=transcript,
                     categories=config.categories,
-                    normally_delete_by_number=normally_delete,
                 )
                 note = analyze_with_ollama(
                     config=config.llm,
@@ -359,17 +355,27 @@ def command_delete_approved(config: AppConfig) -> int:
             """
             SELECT * FROM calls
             WHERE review_status = ?
-              AND reviewed_retention = ?
             ORDER BY timestamp ASC
             """,
-            (
-                ReviewStatus.REVIEWED.value,
-                RetentionDecision.DELETE_AUDIO_KEEP_TRANSCRIPT.value,
-            ),
+            (ReviewStatus.REVIEWED.value,),
         ).fetchall()
 
         for row in rows:
             call = row_to_dict(row)
+            reviewed_retention = str(call.get("reviewed_retention") or "")
+            phone_number = normalize_phone_number(str(call.get("phone_number") or ""))
+            is_normally_deleted = phone_number in config.normalized_delete_numbers()
+
+            should_delete = (
+                reviewed_retention == RetentionDecision.DELETE.value
+                or (
+                    reviewed_retention == RetentionDecision.DEFAULT.value
+                    and is_normally_deleted
+                )
+            )
+            if not should_delete:
+                continue
+
             audio_path = Path(str(call["audio_path"]))
             if not audio_path.exists():
                 print(f"SKIP missing audio #{call['id']}: {audio_path}")

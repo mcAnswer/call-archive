@@ -14,7 +14,6 @@ def build_prompt(
     metadata: dict[str, Any],
     transcript: str,
     categories: list[str],
-    normally_delete_by_number: bool,
 ) -> str:
     return f"""
 Jesteś lokalnym asystentem do analizy prywatnych transkrypcji rozmów telefonicznych.
@@ -27,16 +26,16 @@ Dostępne kategorie:
 Wybierz dokładnie jedną kategorię z powyższej listy.
 
 Zasady retencji:
-- Jeżeli rozmowa zawiera istotne ustalenia, spór, zobowiązania, kwestie prawne, finansowe, techniczne, reklamacyjne albo dowodowe, rekomenduj keep_audio_important.
-- Jeżeli rozmowa jest nieistotna, spamowa, pomyłkowa, pusta albo czysto organizacyjna bez wartości dowodowej, możesz rekomendować delete_audio_keep_transcript.
-- Jeżeli transkrypcja jest zbyt słaba albo nie da się ocenić treści, rekomenduj needs_review.
-- W pozostałych przypadkach rekomenduj keep_audio.
+- Jeżeli rozmowa zawiera istotne ustalenia, spór, zobowiązania, kwestie prawne, finansowe, techniczne, reklamacyjne albo dowodowe i ma być na pewno zachowana niezależnie od innych reguł, rekomenduj keep.
+- Jeżeli rozmowa jest nieistotna, spamowa, pomyłkowa, pusta albo czysto organizacyjna bez wartości dowodowej i ma być usunięta niezależnie od innych reguł, rekomenduj delete.
+- Jeżeli decyzja ma zostać podjęta wg domyślnej polityki systemu, rekomenduj default.
+- Jeżeli transkrypcja jest zbyt słaba albo nie da się ocenić treści, rekomenduj review.
 
 Dozwolone wartości recommended_retention:
-- delete_audio_keep_transcript
-- keep_audio
-- keep_audio_important
-- needs_review
+- default
+- keep
+- delete
+- review
 
 Dozwolone wartości importance:
 - low
@@ -55,7 +54,7 @@ Wymagany JSON:
   "action_items": ["..."],
   "importance": "low|medium|high|unknown",
   "contains_sensitive_or_legal_content": false,
-  "recommended_retention": "delete_audio_keep_transcript|keep_audio|keep_audio_important|needs_review",
+  "recommended_retention": "default|keep|delete|review",
   "reason": "..."
 }}
 
@@ -91,10 +90,10 @@ def analyze_with_ollama(
             "recommended_retention": {
                 "type": "string",
                 "enum": [
-                    "delete_audio_keep_transcript",
-                    "keep_audio",
-                    "keep_audio_important",
-                    "needs_review",
+                    "default",
+                    "keep",
+                    "delete",
+                    "review",
                 ],
             },
             "reason": {"type": "string"},
