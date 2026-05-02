@@ -27,10 +27,10 @@ Dostępne kategorie:
 Wybierz dokładnie jedną kategorię z powyższej listy.
 
 Zasady retencji:
-- Jeżeli rozmowa zawiera istotne ustalenia, spór, zobowiązania, kwestie prawne, finansowe, techniczne, reklamacyjne albo dowodowe, rekomenduj keep_audio lub keep_audio_important.
+- Jeżeli rozmowa zawiera istotne ustalenia, spór, zobowiązania, kwestie prawne, finansowe, techniczne, reklamacyjne albo dowodowe, rekomenduj keep_audio_important.
 - Jeżeli rozmowa jest nieistotna, spamowa, pomyłkowa, pusta albo czysto organizacyjna bez wartości dowodowej, możesz rekomendować delete_audio_keep_transcript.
 - Jeżeli transkrypcja jest zbyt słaba albo nie da się ocenić treści, rekomenduj needs_review.
-- Numer jest na liście domyślnego usuwania: {normally_delete_by_number}. To nie nakazuje usunięcia, ale obniża próg rekomendacji delete_audio_keep_transcript dla nieistotnych rozmów.
+- W pozostałych przypadkach rekomenduj keep_audio.
 
 Dozwolone wartości recommended_retention:
 - delete_audio_keep_transcript
@@ -122,6 +122,7 @@ def analyze_with_ollama(
             "prompt": prompt,
             "stream": False,
             "format": schema,
+            "think": False,
         },
         timeout=config.timeout_secs,
     )
@@ -132,7 +133,11 @@ def analyze_with_ollama(
     if not isinstance(raw, str):
         raise ValueError("Ollama response does not contain string field 'response'.")
 
-    parsed: Any = json.loads(raw)
+    try:
+        parsed: Any = json.loads(raw)
+    except json.decoder.JSONDecodeError:
+        print("Call JSON:", repr(response_data))
+        raise
     note = CallNote.model_validate(parsed)
     if note.category not in categories:
         note.category = "unknown"
