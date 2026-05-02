@@ -1,0 +1,10 @@
+services:
+  call-archive:
+    build: .
+    container_name: call-archive
+    working_dir: /app
+    volumes:
+      - ./config.example.yaml:/app/config.yaml:ro
+      - ./sample-data/ingest:/data/calls/new
+      - ./sample-data/storage:/data/calls
+    command: ["list", "--config", "/app/config.yaml"]
