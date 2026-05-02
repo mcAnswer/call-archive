@@ -16,11 +16,7 @@ Recordings are produced on the phone and synchronized to the computer (e.g. via 
 That synchronization step is **out of scope** for this project.
 
 The only assumption:
-- new recordings (audio + JSON metadata) appear in:
-
-```text
-/data/calls/new/
-````
+- new recordings (audio + JSON metadata) appear in configured `ingest_dir`.
 
 ## Goals
 
@@ -59,7 +55,7 @@ The only assumption:
 
 ## Features
 
-* Directory-based ingestion model (`new/ → year/ → rm/`)
+* Directory-based ingestion model (`ingest_dir/ → storage_dir/{year}/ → storage_dir/rm/`)
 * Full local processing (no cloud dependency)
 * Structured outputs (JSON + SQLite)
 * Extensible **categories** (configured in YAML)

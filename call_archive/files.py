@@ -13,11 +13,11 @@ from .config import normalize_phone_number
 AUDIO_SUFFIXES: set[str] = {".oga", ".ogg", ".opus", ".m4a", ".mp3", ".wav", ".flac"}
 
 
-def ensure_layout(recordings_dir: Path, transcripts_dir: Path, notes_dir: Path) -> None:
+def ensure_layout(ingest_dir: Path, storage_dir: Path, transcripts_dir: Path, notes_dir: Path) -> None:
     for directory in [
-        recordings_dir,
-        recordings_dir / "new",
-        recordings_dir / "rm",
+        ingest_dir,
+        storage_dir,
+        storage_dir / "rm",
         transcripts_dir,
         notes_dir,
     ]:
@@ -74,17 +74,19 @@ def transcript_path_for_audio(audio_path: Path) -> Path:
     return audio_path.with_suffix(".txt")
 
 
-def move_pair_to_year(audio_path: Path, recordings_dir: Path, metadata: dict[str, Any]) -> tuple[Path, Path]:
+def move_pair_to_year(audio_path: Path, storage_dir: Path, metadata: dict[str, Any]) -> tuple[Path, Path]:
     year = metadata_year(metadata)
-    target_dir = recordings_dir / year
+    target_dir = storage_dir / year
     target_dir.mkdir(parents=True, exist_ok=True)
 
     metadata_path = sibling_metadata_path(audio_path)
     target_audio = unique_target(target_dir / audio_path.name)
     target_metadata = target_audio.with_suffix(".json")
 
-    shutil.move(str(audio_path), str(target_audio))
-    shutil.move(str(metadata_path), str(target_metadata))
+    if audio_path.exists():
+        shutil.move(str(audio_path), str(target_audio))
+    if metadata_path.exists():
+        shutil.move(str(metadata_path), str(target_metadata))
 
     return target_audio, target_metadata
 
@@ -105,8 +107,8 @@ def unique_target(path: Path) -> Path:
         counter += 1
 
 
-def move_audio_to_rm(audio_path: Path, recordings_dir: Path) -> Path:
-    rm_dir = recordings_dir / "rm"
+def move_audio_to_rm(audio_path: Path, storage_dir: Path) -> Path:
+    rm_dir = storage_dir / "rm"
     rm_dir.mkdir(parents=True, exist_ok=True)
     target = unique_target(rm_dir / audio_path.name)
     shutil.move(str(audio_path), str(target))
