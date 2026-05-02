@@ -26,8 +26,8 @@ Dostępne kategorie:
 Wybierz dokładnie jedną kategorię z powyższej listy.
 
 Zasady retencji:
-- Jeżeli rozmowa ma być na pewno zachowana niezależnie od innych reguł, rekomenduj keep.
-- Jeżeli rozmowa ma być usunięta niezależnie od innych reguł, rekomenduj delete.
+- Jeżeli rozmowa zawiera istotne ustalenia, spór, zobowiązania, kwestie prawne, finansowe, techniczne, reklamacyjne albo dowodowe i ma być na pewno zachowana niezależnie od innych reguł, rekomenduj keep.
+- Jeżeli rozmowa jest nieistotna, spamowa, pomyłkowa, pusta albo czysto organizacyjna bez wartości dowodowej i ma być usunięta niezależnie od innych reguł, rekomenduj delete.
 - Jeżeli decyzja ma zostać podjęta wg domyślnej polityki systemu, rekomenduj default.
 - Jeżeli transkrypcja jest zbyt słaba albo nie da się ocenić treści, rekomenduj review.
 
