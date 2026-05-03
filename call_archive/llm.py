@@ -71,6 +71,7 @@ def analyze_with_ollama(
     config: LlmConfig,
     prompt: str,
     categories: list[str],
+    keep_alive: str | None = None,
 ) -> CallNote:
     if config.provider != "ollama":
         raise ValueError(f"Unsupported LLM provider: {config.provider}")
@@ -114,15 +115,19 @@ def analyze_with_ollama(
         "additionalProperties": False,
     }
 
+    request_payload: dict[str, Any] = {
+        "model": config.model,
+        "prompt": prompt,
+        "stream": False,
+        "format": schema,
+        "think": False,
+    }
+    if keep_alive is not None:
+        request_payload["keep_alive"] = keep_alive
+
     response = requests.post(
         f"{config.base_url.rstrip('/')}/api/generate",
-        json={
-            "model": config.model,
-            "prompt": prompt,
-            "stream": False,
-            "format": schema,
-            "think": False,
-        },
+        json=request_payload,
         timeout=config.timeout_secs,
     )
     response.raise_for_status()

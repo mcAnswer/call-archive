@@ -4,6 +4,7 @@ import argparse
 import json
 import sqlite3
 from datetime import datetime, timezone
+from time import perf_counter
 from pathlib import Path
 from typing import Any
 
@@ -80,6 +81,9 @@ def command_scan(config: AppConfig) -> int:
             if not metadata_path.exists():
                 print(f"SKIP missing metadata: {audio_path}")
                 continue
+
+            started_at = perf_counter()
+            keep_alive = "10m" if index < len(rows) - 1 else None
 
             try:
                 metadata = load_metadata(metadata_path)
@@ -181,12 +185,14 @@ def command_process(config: AppConfig, limit: int) -> int:
 
         rows = connection.execute(query, parameters).fetchall()
 
-        for row in rows:
+        for index, row in enumerate(rows):
             call = row_to_dict(row)
             call_id = int(call["id"])
             audio_path = Path(str(call["audio_path"]))
             metadata_path = Path(str(call["metadata_path"]))
             now = utc_now()
+            started_at = perf_counter()
+            keep_alive = "10m" if index < len(rows) - 1 else None
 
             try:
                 storage_stem = str(call["storage_stem"] or audio_path.stem)
@@ -220,6 +226,7 @@ def command_process(config: AppConfig, limit: int) -> int:
                     config=config.llm,
                     prompt=prompt,
                     categories=config.categories,
+                    keep_alive=keep_alive,
                 )
 
                 note_path = config.notes_dir / f"{storage_stem}.txt"
@@ -250,7 +257,8 @@ def command_process(config: AppConfig, limit: int) -> int:
                         call_id,
                     ),
                 )
-                print(f"PROCESSED #{call_id} {audio_path.name}")
+                elapsed_secs = perf_counter() - started_at
+                print(f"PROCESSED #{call_id} {audio_path.name} in {elapsed_secs:.2f}s")
 
             except Exception as exception:
                 connection.execute(
@@ -297,7 +305,7 @@ def command_list(config: AppConfig, status: str | None, category: str | None) ->
 
     with connect(config.database_path) as connection:
         rows = connection.execute(query, parameters).fetchall()
-        for row in rows:
+        for index, row in enumerate(rows):
             call = row_to_dict(row)
             print(
                 f"#{call['id']} {call['timestamp']} "
@@ -360,7 +368,7 @@ def command_delete_approved(config: AppConfig) -> int:
             (ReviewStatus.REVIEWED.value,),
         ).fetchall()
 
-        for row in rows:
+        for index, row in enumerate(rows):
             call = row_to_dict(row)
             reviewed_retention = str(call.get("reviewed_retention") or "")
             phone_number = normalize_phone_number(str(call.get("phone_number") or ""))
