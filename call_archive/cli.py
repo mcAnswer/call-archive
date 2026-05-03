@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -189,6 +190,7 @@ def command_process(config: AppConfig, limit: int) -> int:
             now = utc_now()
 
             try:
+                started_at = time.perf_counter()
                 storage_stem = str(call["storage_stem"] or audio_path.stem)
                 transcript_path = config.transcripts_dir / f"{storage_stem}.txt"
                 if call["transcription_status"] != ProcessingStatus.DONE.value:
@@ -250,7 +252,8 @@ def command_process(config: AppConfig, limit: int) -> int:
                         call_id,
                     ),
                 )
-                print(f"PROCESSED #{call_id} {audio_path.name}")
+                elapsed_secs = time.perf_counter() - started_at
+                print(f"PROCESSED #{call_id} {audio_path.name} in {elapsed_secs:.2f}s")
 
             except Exception as exception:
                 connection.execute(

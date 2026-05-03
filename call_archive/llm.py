@@ -122,6 +122,7 @@ def analyze_with_ollama(
             "stream": False,
             "format": schema,
             "think": False,
+            "keep_alive": "10m",
         },
         timeout=config.timeout_secs,
     )
