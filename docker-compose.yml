@@ -1,0 +1,9 @@
+services:
+  call-archive:
+    image: call-archive
+    working_dir: /app
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - /mnt/Mondoshawan/mcanswer/Tachikoma/recordedCalls:/data/calls/new
+      - /mnt/Mondoshawan/mcanswer/RecordedCalls:/data/calls
+    command: ["list", "--config", "/app/config.yaml"]

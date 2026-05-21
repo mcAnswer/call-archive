@@ -1,0 +1,32 @@
+ingest_dir: /data/calls/new
+storage_dir: /data/calls
+database_path: /data/calls/calls.sqlite
+transcripts_dir: /data/calls/transcripts
+notes_dir: /data/calls/notes
+
+transcription:
+  module: transcribe
+  model: medium
+  device: cpu
+  compute_type: int8
+  beam_size: 5
+  vad_filter: true
+  timestamps: false
+
+llm:
+  provider: ollama
+  base_url: http://127.0.0.1:11434
+  model: qwen2.5:14b-instruct
+  timeout_secs: 180
+
+categories:
+  - work
+  - family
+  - spam
+  - friends
+  - unknown
+
+retention:
+  normally_delete_numbers:
+    - "123456789"
+    - "+48123456789"
